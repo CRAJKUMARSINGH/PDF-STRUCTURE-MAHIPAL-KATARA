@@ -1,0 +1,21 @@
+PROJECT : BLOCK LIBRARY AT VAKHATPURA, PS-ARTHUNA  JOBNO :1  REF.NO :	
+
+PLAN : LIBR	
+
+DATE : 10/26/25    TIME : 20:03:48	
+
+
+S L A B   D E S I G N   S C H E D U L E	
+
+	
+Slab Group	Slab IDs	Concrete 	Thickness 	 Bottom Reinforcement	 	 Top Reinforcement ( Extra Steel )	 	 	 	Remark 	
+ 	 	Grade 	mm	 Main Steel 	 Other Steel 	 @ Left Edge	 @ Right Edge	 @ Up Edge	 @ Down Edge	 	
+ 	 	 	 	 	 	 	 	 	 	 	
+SG1	S1	M20	155	#8 @ 125 c/c 	#8 @ 145 c/c 	--	--	#8 @ 270 c/c 	--	TwoWay 	
+SG2	S2	M20	150	#8 @ 165 c/c 	#8 @ 175 c/c 	--	--	#8 @ 270 c/c 	#8 @ 270 c/c 	TwoWay 	
+SG3	S3	M20	155	#8 @ 125 c/c 	#8 @ 145 c/c 	--	--	--	#8 @ 270 c/c 	TwoWay 	
+NOTES : 	
+
+1. All Diameters in Schedule are in mm	
+
+1. All Spacings in Schedule are in mm	

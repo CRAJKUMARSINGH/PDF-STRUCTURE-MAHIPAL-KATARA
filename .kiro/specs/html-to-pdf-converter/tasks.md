@@ -1,0 +1,122 @@
+# Implementation Plan
+
+- [ ] 1. Set up project structure and dependencies
+  - Create Python project directory structure with modules: `cli.py`, `scanner.py`, `converter.py`, `merger.py`, `reporter.py`
+  - Create `requirements.txt` with dependencies: pdfkit, PyPDF2
+  - Create `README.md` with installation instructions for wkhtmltopdf system dependency
+  - _Requirements: 1.1, 3.1, 3.2_
+
+- [ ] 2. Implement data models and configuration
+  - Create `models.py` with `ConversionResult` dataclass containing total_files, successful, failed, output_path, and processing_order fields
+  - Create `ConverterConfig` dataclass with source_dir, output_file, temp_dir, and wkhtmltopdf_options fields
+  - _Requirements: 1.1, 3.3, 3.4_
+
+- [ ] 3. Implement file scanner module
+  - [ ] 3.1 Create `scanner.py` with `scan_html_files()` function
+    - Implement directory scanning for .html and .htm files using pathlib
+    - Implement alphabetical sorting of discovered files
+    - Return list of Path objects
+    - _Requirements: 1.1, 4.1_
+  - [ ] 3.2 Add error handling for file system issues
+    - Handle directory not found errors
+    - Handle permission denied errors
+    - _Requirements: 2.1_
+
+- [ ] 4. Implement HTML to PDF converter module
+  - [ ] 4.1 Create `converter.py` with `HTMLConverter` class
+    - Implement `__init__()` to set up temporary directory for intermediate PDFs
+    - Implement `convert_file()` method to convert single HTML file using pdfkit
+    - Configure wkhtmltopdf options (enable-local-file-access, UTF-8 encoding)
+    - _Requirements: 1.2, 1.1_
+  - [ ] 4.2 Implement batch conversion with error handling
+    - Create `convert_batch()` method that processes list of HTML files
+    - Catch conversion errors for individual files and continue processing
+    - Track successful conversions and failed conversions with error messages
+    - Return tuple of (successful_pdfs, failed_conversions)
+    - _Requirements: 1.2, 2.1, 2.2, 2.3_
+  - [ ] 4.3 Add temporary file cleanup
+    - Implement cleanup of temporary PDF files after merge
+    - Handle cleanup on both success and error scenarios
+    - _Requirements: 1.3_
+
+- [ ] 5. Implement PDF merger module
+  - [ ] 5.1 Create `merger.py` with `merge_pdfs()` function
+    - Use PyPDF2 to combine multiple PDF files in specified order
+    - Write merged output to specified output path
+    - Return boolean indicating success/failure
+    - _Requirements: 1.3, 1.4, 4.2_
+  - [ ] 5.2 Add error handling for merge failures
+    - Handle corrupted PDF errors
+    - Handle file write permission errors
+    - Raise appropriate exceptions for critical failures
+    - _Requirements: 2.4_
+
+- [ ] 6. Implement result reporter module
+  - Create `reporter.py` with `report_results()` function
+  - Display total files found, successful conversions, and output file location
+  - Display list of failed conversions with error messages
+  - Format output for console readability
+  - _Requirements: 1.5, 2.2_
+
+- [ ] 7. Implement CLI module and orchestration
+  - [ ] 7.1 Create `cli.py` with argument parser
+    - Use argparse to define `--source-dir` / `-s` and `--output` / `-o` arguments
+    - Set default source directory to current working directory
+    - Generate default output filename with timestamp format: `combined_YYYYMMDD_HHMMSS.pdf`
+    - Validate and convert arguments to Path objects
+    - _Requirements: 3.1, 3.2, 3.3, 3.4_
+  - [ ] 7.2 Implement main orchestration logic
+    - Call scanner to get sorted list of HTML files
+    - Display processing order to user
+    - Initialize HTMLConverter and call convert_batch()
+    - Call merge_pdfs() with successful conversions
+    - Handle case where no files are successfully converted (exit without creating output)
+    - Create ConversionResult object with all statistics
+    - Call reporter to display results
+    - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 2.3, 2.4, 4.3_
+  - [ ] 7.3 Add logging configuration
+    - Configure Python logging module with INFO, WARNING, and ERROR levels
+    - Set log format: `[TIMESTAMP] [LEVEL] [MODULE] Message`
+    - Log file processing progress and errors
+    - _Requirements: 2.1, 2.2_
+  - [ ] 7.4 Create entry point
+    - Add `if __name__ == "__main__":` block to call main()
+    - Add exception handling for top-level errors
+    - _Requirements: 1.1_
+
+- [ ] 8. Create test suite
+  - [ ] 8.1 Create test HTML files
+    - Create `tests/fixtures/` directory with sample HTML files
+    - Create `test_01.html` with simple text content
+    - Create `test_02.html` with CSS styling
+    - Create `test_03.html` with local image references
+    - Create `test_invalid.html` with malformed HTML
+    - _Requirements: 1.1, 2.1_
+  - [ ] 8.2 Write unit tests for scanner module
+    - Test HTML file discovery with .html and .htm extensions
+    - Test alphabetical sorting
+    - Test empty directory handling
+    - Test directory with no HTML files
+    - _Requirements: 1.1, 4.1_
+  - [ ] 8.3 Write unit tests for converter module
+    - Test successful single file conversion
+    - Test batch conversion with mixed success/failure
+    - Test temporary file cleanup
+    - _Requirements: 1.2, 2.1, 2.3_
+  - [ ] 8.4 Write unit tests for merger module
+    - Test merging multiple PDFs
+    - Test single PDF handling
+    - Test output file creation
+    - _Requirements: 1.3, 4.2_
+  - [ ] 8.5 Write integration tests
+    - Test end-to-end conversion with sample HTML files
+    - Verify output PDF exists and page order is correct
+    - Test error recovery with mix of valid and invalid files
+    - Verify partial success generates output
+    - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 2.1, 2.2, 2.3_
+
+- [ ] 9. Create documentation and usage examples
+  - Update README.md with usage examples and command-line options
+  - Document wkhtmltopdf installation steps for Windows, Linux, and macOS
+  - Add example commands for common use cases
+  - _Requirements: 3.1, 3.2, 3.3, 3.4_
