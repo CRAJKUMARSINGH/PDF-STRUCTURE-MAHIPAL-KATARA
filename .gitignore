@@ -34,7 +34,19 @@ LOGS/*.log
 !LOGS/.gitkeep
 !INPUT_DATA/.gitkeep
 
+# Large output files and directories
+OUTPUT_PDF/
+combined_reports.pdf
+enhanced_reports.pdf
+ultra_elegant_reports.pdf
+
+# Local files
+.local/
+*.rar
+
+# Log files
+*.log
+
 # Temporary files
 *.tmp
-*.bak
-*.log
+*.temp
