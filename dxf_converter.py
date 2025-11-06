@@ -18,13 +18,58 @@ class DXFToPDFConverter:
     MARGIN_MM = 10
     DPI = 300
     
-    def __init__(self, input_folder="INPUT_DATA", output_folder="OUTPUT_PDF", log_folder="LOGS"):
+    # 3 SCALE OPTIONS CONFIGURATION
+    SCALE_OPTIONS = {
+        'standard': {
+            'factor': 1.0,
+            'name': 'Standard Scale',
+            'description': 'Normal page count - fast processing',
+            'max_pages': 50,
+            'dpi_multiplier': 1.0,
+            'suffix': ''
+        },
+        'enlarged_2x': {
+            'factor': 2.0,
+            'name': '2x Enlarged Scale',
+            'description': 'Double detail - moderate processing',
+            'max_pages': 100,
+            'dpi_multiplier': 1.2,
+            'suffix': '_ENLARGED_2x'
+        },
+        'maximum_4x': {
+            'factor': 4.0,
+            'name': '4x Maximum Detail',
+            'description': 'Maximum precision - detailed processing',
+            'max_pages': 200,
+            'dpi_multiplier': 1.5,
+            'suffix': '_MAXIMUM_4x'
+        }
+    }
+    
+    def __init__(self, input_folder="INPUT_DATA", output_folder="OUTPUT_PDF", log_folder="LOGS", 
+                 scale_mode='standard'):
         self.input_folder = Path(input_folder)
         self.output_folder = Path(output_folder)
         self.log_folder = Path(log_folder)
         
+        # SCALE MODE CONFIGURATION
+        if scale_mode not in self.SCALE_OPTIONS:
+            scale_mode = 'standard'
+            
+        self.scale_mode = scale_mode
+        self.scale_config = self.SCALE_OPTIONS[scale_mode]
+        self.scale_factor = self.scale_config['factor']
+        self.detail_enhancement = scale_mode != 'standard'
+        self.max_pages = self.scale_config['max_pages']
+        
         self.output_folder.mkdir(exist_ok=True)
         self.log_folder.mkdir(exist_ok=True)
+        
+        logger.info(f"🎯 DXF Converter initialized:")
+        logger.info(f"   Scale mode: {self.scale_config['name']} ({self.scale_factor}x)")
+        logger.info(f"   Description: {self.scale_config['description']}")
+        logger.info(f"   Maximum pages: {self.max_pages}")
+        logger.info(f"   Detail enhancement: {'ENABLED' if self.detail_enhancement else 'DISABLED'}")
     
     def get_drawing_bounds(self, msp):
         min_x = min_y = float('inf')
@@ -71,36 +116,93 @@ class DXFToPDFConverter:
         if total_width <= 0 or total_height <= 0:
             return [(min_x, min_y, max_x, max_y)]
         
+        # ENLARGED SCALE CALCULATION - 4x more detailed pages
         a4_aspect = self.A4_WIDTH_MM / self.A4_HEIGHT_MM
-        page_height = total_width / a4_aspect
         
-        if total_height <= page_height * 1.3:
-            return [(min_x, min_y, max_x, max_y)]
-        
-        num_pages = int(np.ceil(total_height / page_height))
-        num_pages = min(num_pages, 50)
-        
-        logger.info(f"Drawing size: {total_width:.1f} x {total_height:.1f}, splitting into {num_pages} page(s)")
-        
-        regions = []
-        section_height = total_height / num_pages
-        overlap = section_height * 0.05
-        
-        for i in range(num_pages):
-            y_start = min_y + i * section_height - (overlap if i > 0 else 0)
-            y_end = min_y + (i + 1) * section_height + (overlap if i < num_pages - 1 else 0)
-            y_end = min(y_end, max_y)
+        if self.detail_enhancement:
+            # CALCULATE ENLARGED SCALE REGIONS
+            # Reduce the effective page size by scale factor for more detailed view
+            effective_page_width = total_width / self.scale_factor
+            effective_page_height = effective_page_width / a4_aspect
             
-            if y_start < max_y:
-                regions.append((min_x, y_start, max_x, y_end))
+            # Calculate number of pages in both dimensions for grid-based splitting
+            pages_horizontal = max(1, int(np.ceil(total_width / effective_page_width)))
+            pages_vertical = max(1, int(np.ceil(total_height / effective_page_height)))
+            
+            total_pages = pages_horizontal * pages_vertical
+            total_pages = min(total_pages, self.max_pages)
+            
+            logger.info(f"🔍 ENLARGED SCALE CONVERSION:")
+            logger.info(f"   Drawing size: {total_width:.1f} x {total_height:.1f}")
+            logger.info(f"   Scale factor: {self.scale_factor}x")
+            logger.info(f"   Grid layout: {pages_horizontal} x {pages_vertical}")
+            logger.info(f"   Total pages: {total_pages} (vs ~{total_pages//4} standard)")
+            logger.info(f"   Detail level: MAXIMUM PRECISION")
+            
+            regions = []
+            
+            # Create grid-based regions for maximum detail
+            for row in range(pages_vertical):
+                for col in range(pages_horizontal):
+                    if len(regions) >= self.max_pages:
+                        break
+                    
+                    # Calculate region boundaries with overlap for continuity
+                    overlap_x = effective_page_width * 0.05
+                    overlap_y = effective_page_height * 0.05
+                    
+                    x_start = min_x + col * effective_page_width - (overlap_x if col > 0 else 0)
+                    x_end = min_x + (col + 1) * effective_page_width + (overlap_x if col < pages_horizontal - 1 else 0)
+                    x_end = min(x_end, max_x)
+                    
+                    y_start = min_y + row * effective_page_height - (overlap_y if row > 0 else 0)
+                    y_end = min_y + (row + 1) * effective_page_height + (overlap_y if row < pages_vertical - 1 else 0)
+                    y_end = min(y_end, max_y)
+                    
+                    if x_start < max_x and y_start < max_y:
+                        regions.append((x_start, y_start, x_end, y_end))
+                
+                if len(regions) >= self.max_pages:
+                    break
+            
+        else:
+            # STANDARD SCALE CALCULATION (original method)
+            page_height = total_width / a4_aspect
+            
+            if total_height <= page_height * 1.3:
+                return [(min_x, min_y, max_x, max_y)]
+            
+            num_pages = int(np.ceil(total_height / page_height))
+            num_pages = min(num_pages, 50)
+            
+            logger.info(f"Drawing size: {total_width:.1f} x {total_height:.1f}, splitting into {num_pages} page(s)")
+            
+            regions = []
+            section_height = total_height / num_pages
+            overlap = section_height * 0.05
+            
+            for i in range(num_pages):
+                y_start = min_y + i * section_height - (overlap if i > 0 else 0)
+                y_end = min_y + (i + 1) * section_height + (overlap if i < num_pages - 1 else 0)
+                y_end = min(y_end, max_y)
+                
+                if y_start < max_y:
+                    regions.append((min_x, y_start, max_x, y_end))
         
         return regions
     
-    def convert_dxf_to_pdf(self, dxf_path, pdf_path=None, max_pages=50):
+    def convert_dxf_to_pdf(self, dxf_path, pdf_path=None, max_pages=None):
+        if max_pages is None:
+            max_pages = self.max_pages
+            
         if pdf_path is None:
-            pdf_path = self.output_folder / f"{Path(dxf_path).stem}_A4_landscape.pdf"
+            scale_suffix = self.scale_config['suffix']
+            pdf_path = self.output_folder / f"{Path(dxf_path).stem}{scale_suffix}_A4_landscape.pdf"
         
-        logger.info(f"Converting {dxf_path} to {pdf_path}")
+        logger.info(f"🏗️  Converting {dxf_path} to {pdf_path}")
+        logger.info(f"🎯 Scale Mode: {self.scale_config['name']} ({self.scale_factor}x)")
+        if self.detail_enhancement:
+            logger.info(f"🔍 Detail Enhancement: {self.scale_config['description']}")
         
         try:
             try:
@@ -122,17 +224,28 @@ class DXFToPDFConverter:
             min_x, min_y, max_x, max_y = self.get_drawing_bounds(msp)
             regions = self.calculate_page_regions(min_x, min_y, max_x, max_y)
             
-            logger.info(f"Drawing bounds: ({min_x:.1f}, {min_y:.1f}) to ({max_x:.1f}, {max_y:.1f})")
-            logger.info(f"Creating {len(regions)} page(s)")
+            logger.info(f"📐 Drawing bounds: ({min_x:.1f}, {min_y:.1f}) to ({max_x:.1f}, {max_y:.1f})")
+            logger.info(f"📄 Creating {len(regions)} page(s) with {self.scale_factor}x enlargement")
+            
+            # ENHANCED DPI based on scale mode
+            enhanced_dpi = int(self.DPI * self.scale_config['dpi_multiplier'])
             
             fig_width_inch = self.A4_WIDTH_MM / 25.4
             fig_height_inch = self.A4_HEIGHT_MM / 25.4
             
             with PdfPages(pdf_path) as pdf:
                 for idx, (rx_min, ry_min, rx_max, ry_max) in enumerate(regions[:max_pages]):
-                    logger.info(f"Rendering page {idx + 1}/{len(regions)}")
+                    progress = f"{idx + 1}/{len(regions)}"
                     
-                    fig = plt.figure(figsize=(fig_width_inch, fig_height_inch), dpi=self.DPI)
+                    # OPTIMIZED progress reporting for large page counts
+                    if self.detail_enhancement and len(regions) > 10:
+                        # Report every 5th page for large conversions to reduce log spam
+                        if idx % 5 == 0 or idx == len(regions) - 1:
+                            logger.info(f"🖨️  Rendering pages {idx + 1}-{min(idx + 5, len(regions))}/{len(regions)} - Progress: {((idx + 1) / len(regions) * 100):.0f}%")
+                    else:
+                        logger.info(f"🖨️  Rendering page {progress} - Region: ({rx_min:.1f}, {ry_min:.1f}) to ({rx_max:.1f}, {ry_max:.1f})")
+                    
+                    fig = plt.figure(figsize=(fig_width_inch, fig_height_inch), dpi=enhanced_dpi)
                     ax = fig.add_subplot(111)
                     ax.set_aspect('equal')
                     
@@ -145,25 +258,42 @@ class DXFToPDFConverter:
                     region_height = ry_max - ry_min
                     
                     if region_width > 0 and region_height > 0:
-                        margin_x = region_width * 0.05
-                        margin_y = region_height * 0.05
+                        # REDUCED margins for enlarged scale to show maximum detail
+                        margin_factor = 0.02 if self.detail_enhancement else 0.05
+                        margin_x = region_width * margin_factor
+                        margin_y = region_height * margin_factor
                         
                         ax.set_xlim(rx_min - margin_x, rx_max + margin_x)
                         ax.set_ylim(ry_min - margin_y, ry_max + margin_y)
                     
                     ax.axis('off')
                     
-                    pdf.savefig(fig, dpi=self.DPI, bbox_inches='tight', pad_inches=0.1)
+                    # ENHANCED quality settings for enlarged scale
+                    pdf.savefig(fig, dpi=enhanced_dpi, bbox_inches='tight', 
+                              pad_inches=0.05 if self.detail_enhancement else 0.1,
+                              facecolor='white', edgecolor='none')
                     plt.close(fig)
+                    
+                    # MEMORY cleanup for large conversions
+                    if self.detail_enhancement and idx % 10 == 0:
+                        import gc
+                        gc.collect()  # Force garbage collection every 10 pages
                 
                 d = pdf.infodict()
-                d['Title'] = f'{Path(dxf_path).stem} - A4 Landscape'
-                d['Author'] = 'DXF to PDF Converter'
-                d['Subject'] = 'Architectural/Structural Drawing'
-                d['Keywords'] = 'DXF, PDF, A4, Landscape, Footing, Structural'
+                scale_info = f" - {self.scale_config['name']}" if self.detail_enhancement else ""
+                d['Title'] = f'{Path(dxf_path).stem}{scale_info} - A4 Landscape'
+                d['Author'] = 'Multi-Scale DXF to PDF Converter'
+                d['Subject'] = f'Architectural/Structural Drawing - {self.scale_config["name"]}'
+                d['Keywords'] = f'DXF, PDF, A4, Landscape, Footing, Structural, Scale, {self.scale_mode}, {self.scale_factor}x'
                 d['CreationDate'] = datetime.now()
             
-            logger.info(f"Successfully created PDF with {len(regions)} page(s): {pdf_path}")
+            success_msg = f"✅ Successfully created {self.scale_config['name']} PDF with {len(regions)} page(s): {pdf_path}"
+            if self.detail_enhancement:
+                estimated_standard = max(1, len(regions) // int(self.scale_factor))
+                success_msg += f"\n   🎯 Scale: {self.scale_factor}x ({self.scale_config['description']})"
+                success_msg += f"\n   📄 Pages: {len(regions)} (vs ~{estimated_standard} standard scale)"
+            
+            logger.info(success_msg)
             return True, str(pdf_path), len(regions)
         
         except Exception as e:
@@ -179,10 +309,16 @@ class DXFToPDFConverter:
             logger.warning(f"No DXF files found in {self.input_folder}")
             return []
         
-        logger.info(f"Found {len(dxf_files)} DXF files to convert")
+        # ALPHABETICAL SORTING - case insensitive
+        dxf_files.sort(key=lambda f: f.name.lower())
+        
+        logger.info(f"Found {len(dxf_files)} DXF files to convert (ALPHABETICAL ORDER):")
+        for i, dxf_file in enumerate(dxf_files, 1):
+            logger.info(f"  {i:2d}. {dxf_file.name}")
         
         results = []
-        for dxf_file in dxf_files:
+        for i, dxf_file in enumerate(dxf_files, 1):
+            logger.info(f"\n🔄 Processing DXF {i}/{len(dxf_files)}: {dxf_file.name}")
             success, output, pages = self.convert_dxf_to_pdf(dxf_file)
             results.append({
                 'input': str(dxf_file),

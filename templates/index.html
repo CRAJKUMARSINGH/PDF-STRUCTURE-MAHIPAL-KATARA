@@ -225,33 +225,67 @@
 </head>
 <body>
     <div class="container">
-        <h1>🏗️ DXF to PDF Converter</h1>
-        <p class="subtitle">Convert architectural/structural DXF drawings to A4 Landscape PDF with intelligent multi-page splitting</p>
+        <h1>🏗️ DXF & HTML to PDF Converter</h1>
+        <p class="subtitle">Convert architectural/structural DXF drawings and HTML reports to PDF with intelligent multi-page splitting</p>
         
         <div class="section">
-            <h2 class="section-title">📤 Upload DXF Files</h2>
+            <h2 class="section-title">📤 Upload Files</h2>
             <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
                 <div class="upload-icon">📁</div>
-                <h3>Click or drag DXF files here</h3>
-                <p style="color: #666; margin-top: 10px;">Supports batch upload of multiple DXF files</p>
-                <input type="file" id="fileInput" multiple accept=".dxf,.DXF">
+                <h3>Click or drag DXF or HTML files here</h3>
+                <p style="color: #666; margin-top: 10px;">Supports batch upload of DXF and HTML files</p>
+                <input type="file" id="fileInput" multiple accept=".dxf,.DXF,.html,.htm,.HTML,.HTM">
             </div>
             
             <div id="uploadStatus" class="status"></div>
         </div>
         
+        <!-- Unified Conversion Section -->
+        <div class="section" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 10px; margin-bottom: 30px;">
+            <h2 style="color: white; border-bottom: 2px solid white; margin-bottom: 15px;">🚀 UNIFIED CONVERSION - ONE CLICK SOLUTION</h2>
+            <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                <h4 style="margin-bottom: 10px;">✨ Enhanced Features:</h4>
+                <ul style="margin: 0; padding-left: 20px;">
+                    <li><strong>🔤 Alphabetical Processing:</strong> Files processed in A-Z order</li>
+                    <li><strong>📄 Individual DXF PDFs:</strong> Each DXF becomes a separate PDF</li>
+                    <li><strong>📚 Combined DXF PDF:</strong> All DXF PDFs merged into one master file</li>
+                    <li><strong>📁 Organized Output:</strong> Date-stamped session folders</li>
+                </ul>
+            </div>
+            <button class="btn" onclick="convertAllFiles()" style="background: white; color: #667eea; font-weight: bold; font-size: 1.1em; padding: 15px 30px;">
+                ⚡ CONVERT ALL FILES (ALPHABETICAL + COMBINED)
+            </button>
+            <div id="unifiedStatus" class="status" style="margin-top: 15px;"></div>
+        </div>
+        
         <div class="section">
-            <h2 class="section-title">📋 Input Files (DXF)</h2>
-            {% if input_files %}
-                <button class="btn btn-success" onclick="convertAll()" style="margin-bottom: 15px;">
-                    🔄 Convert All to PDF (A4 Landscape)
-                </button>
+            <h2 class="section-title">📋 DXF Files - ENHANCED SCALE OPTIONS</h2>
+            {% if dxf_files %}
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <h4>🎯 3 Scale Options Available:</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: 10px 0;">
+                        <button class="btn btn-success" onclick="convertAllDXF('standard')" style="padding: 10px;">
+                            📄 Standard<br><small>Fast • Normal pages</small>
+                        </button>
+                        <button class="btn" onclick="convertAllDXF('enlarged_2x')" style="background: #f39c12; color: white; padding: 10px;">
+                            🔍 2x Enlarged<br><small>Moderate • Double detail</small>
+                        </button>
+                        <button class="btn" onclick="convertAllDXF('maximum_4x')" style="background: #e74c3c; color: white; font-weight: bold; padding: 10px;">
+                            🎯 4x Maximum<br><small>Detailed • Max precision</small>
+                        </button>
+                    </div>
+                    <div style="font-size: 0.85em; color: #666; margin-top: 10px;">
+                        <strong>Scale Comparison:</strong> Standard (fast) → 2x Enlarged (moderate) → 4x Maximum (detailed processing)
+                    </div>
+                </div>
                 <ul class="file-list">
-                    {% for file in input_files %}
+                    {% for file in dxf_files %}
                     <li class="file-item">
-                        <span class="file-name">{{ file }}</span>
+                        <span class="file-name">{{ file }} <span class="badge badge-info">DXF</span></span>
                         <div class="file-actions">
-                            <button class="btn btn-primary" onclick="convertFile('{{ file }}')">Convert to PDF</button>
+                            <button class="btn btn-primary" onclick="convertDXFFile('{{ file }}', 'standard')" title="Standard scale - fast processing">📄</button>
+                            <button class="btn" onclick="convertDXFFile('{{ file }}', 'enlarged_2x')" style="background: #f39c12; color: white;" title="2x enlarged scale - moderate detail">🔍</button>
+                            <button class="btn" onclick="convertDXFFile('{{ file }}', 'maximum_4x')" style="background: #e74c3c; color: white;" title="4x maximum detail - highest precision">🎯</button>
                             <button class="btn btn-danger" onclick="deleteInput('{{ file }}')">Delete</button>
                         </div>
                     </li>
@@ -259,7 +293,31 @@
                 </ul>
             {% else %}
                 <div class="empty-state">
-                    <p>No DXF files in INPUT_DATA folder. Upload files above to get started.</p>
+                    <p>No DXF files found. Upload DXF files above to get started.</p>
+                </div>
+            {% endif %}
+        </div>
+        
+        <div class="section">
+            <h2 class="section-title">📄 HTML Files</h2>
+            {% if html_files %}
+                <button class="btn btn-success" onclick="convertAllHTML()" style="margin-bottom: 15px;">
+                    🔄 Convert All HTML to Combined PDF
+                </button>
+                <ul class="file-list">
+                    {% for file in html_files %}
+                    <li class="file-item">
+                        <span class="file-name">{{ file }} <span class="badge badge-success">HTML</span></span>
+                        <div class="file-actions">
+                            <button class="btn btn-primary" onclick="convertHTMLFiles(['{{ file }}'])">Convert to PDF</button>
+                            <button class="btn btn-danger" onclick="deleteInput('{{ file }}')">Delete</button>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <div class="empty-state">
+                    <p>No HTML files found. Upload HTML files above to get started.</p>
                 </div>
             {% endif %}
         </div>
@@ -272,7 +330,23 @@
         <div id="conversionStatus" class="status"></div>
         
         <div class="section">
-            <h2 class="section-title">📄 Generated PDFs (A4 Landscape)</h2>
+            <h2 class="section-title">📂 Session-Based Organized Outputs</h2>
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                <h4>📁 Output Structure:</h4>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li><strong>HTML_REPORTS/session_YYYY-MM-DD_HH-MM-SS/</strong> - Combined HTML reports</li>
+                    <li><strong>DXF_DRAWINGS/session_YYYY-MM-DD_HH-MM-SS/</strong> - Individual DXF drawings</li>
+                    <li><strong>CONVERSION_LOGS/session_YYYY-MM-DD_HH-MM-SS/</strong> - Detailed conversion logs</li>
+                </ul>
+            </div>
+            <button class="btn btn-primary" onclick="loadSessionFolders()" style="margin-bottom: 15px;">
+                🔄 Refresh Session Folders
+            </button>
+            <div id="sessionFolders"></div>
+        </div>
+        
+        <div class="section">
+            <h2 class="section-title">📄 Legacy Generated PDFs</h2>
             {% if output_files %}
                 <ul class="file-list" id="outputList">
                     {% for file in output_files %}
@@ -287,7 +361,7 @@
                 </ul>
             {% else %}
                 <div class="empty-state">
-                    <p>No PDF files generated yet. Convert DXF files above to create PDFs.</p>
+                    <p>No legacy PDF files. Use the unified conversion above for organized outputs.</p>
                 </div>
             {% endif %}
         </div>
@@ -343,11 +417,80 @@
             });
         }
         
-        function convertAll() {
+        function convertAllDXF(scaleMode = 'standard') {
             document.getElementById('loading').style.display = 'block';
-            showStatus('conversionStatus', '', 'info');
+            
+            const scaleNames = {
+                'standard': 'Standard Scale',
+                'enlarged_2x': '2x Enlarged Scale',
+                'maximum_4x': '4x Maximum Detail'
+            };
+            
+            const scaleText = scaleNames[scaleMode] || 'Standard Scale';
+            showStatus('conversionStatus', `Converting DXF files with ${scaleText}...`, 'info');
             
             fetch('/convert', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({scale_mode: scaleMode})
+            })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('loading').style.display = 'none';
+                if (data.success) {
+                    const totalPages = data.results.reduce((sum, r) => sum + (r.pages || 0), 0);
+                    const msg = `✅ DXF Conversion complete with ${scaleText}!\n${data.successful} succeeded, ${data.failed} failed\nTotal pages: ${totalPages}`;
+                    showStatus('conversionStatus', msg, 'success');
+                    setTimeout(() => location.reload(), 2000);
+                } else {
+                    showStatus('conversionStatus', 'DXF Conversion failed: ' + data.error, 'error');
+                }
+            })
+            .catch(err => {
+                document.getElementById('loading').style.display = 'none';
+                showStatus('conversionStatus', 'DXF Conversion error: ' + err, 'error');
+            });
+        }
+        
+        function convertDXFFile(filename, scaleMode = 'standard') {
+            document.getElementById('loading').style.display = 'block';
+            
+            const scaleNames = {
+                'standard': 'Standard Scale',
+                'enlarged_2x': '2x Enlarged Scale',
+                'maximum_4x': '4x Maximum Detail'
+            };
+            
+            const scaleText = scaleNames[scaleMode] || 'Standard Scale';
+            showStatus('conversionStatus', `Converting ${filename} with ${scaleText}...`, 'info');
+            
+            fetch('/convert', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({files: [filename], scale_mode: scaleMode})
+            })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('loading').style.display = 'none';
+                if (data.success && data.results[0].success) {
+                    showStatus('conversionStatus', `✅ Converted ${filename} with ${scaleText} to ${data.results[0].pages} pages!`, 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    const error = data.results ? data.results[0].output : data.error;
+                    showStatus('conversionStatus', 'DXF Conversion failed: ' + error, 'error');
+                }
+            })
+            .catch(err => {
+                document.getElementById('loading').style.display = 'none';
+                showStatus('conversionStatus', 'DXF Conversion error: ' + err, 'error');
+            });
+        }
+        
+        function convertAllHTML() {
+            document.getElementById('loading').style.display = 'block';
+            showStatus('conversionStatus', 'Converting HTML files...', 'info');
+            
+            fetch('/convert_html', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({})
@@ -356,41 +499,40 @@
             .then(data => {
                 document.getElementById('loading').style.display = 'none';
                 if (data.success) {
-                    const msg = `✓ Conversion complete!\n${data.successful} succeeded, ${data.failed} failed\nTotal pages: ${data.results.reduce((sum, r) => sum + (r.pages || 0), 0)}`;
-                    showStatus('conversionStatus', msg, 'success');
+                    showStatus('conversionStatus', `✓ HTML Conversion complete!\n${data.successful} files converted successfully\nOutput: ${data.output_file}`, 'success');
                     setTimeout(() => location.reload(), 2000);
                 } else {
-                    showStatus('conversionStatus', 'Conversion failed: ' + data.error, 'error');
+                    showStatus('conversionStatus', 'HTML Conversion failed: ' + data.error, 'error');
                 }
             })
             .catch(err => {
                 document.getElementById('loading').style.display = 'none';
-                showStatus('conversionStatus', 'Conversion error: ' + err, 'error');
+                showStatus('conversionStatus', 'HTML Conversion error: ' + err, 'error');
             });
         }
         
-        function convertFile(filename) {
+        function convertHTMLFiles(files) {
             document.getElementById('loading').style.display = 'block';
+            showStatus('conversionStatus', `Converting ${files.length} HTML file(s)...`, 'info');
             
-            fetch('/convert', {
+            fetch('/convert_html', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({files: [filename]})
+                body: JSON.stringify({files: files})
             })
             .then(res => res.json())
             .then(data => {
                 document.getElementById('loading').style.display = 'none';
-                if (data.success && data.results[0].success) {
-                    showStatus('conversionStatus', `✓ Converted ${filename} to ${data.results[0].pages} pages!`, 'success');
+                if (data.success) {
+                    showStatus('conversionStatus', `✓ HTML Conversion complete!\nOutput: ${data.output_file}`, 'success');
                     setTimeout(() => location.reload(), 1500);
                 } else {
-                    const error = data.results ? data.results[0].output : data.error;
-                    showStatus('conversionStatus', 'Conversion failed: ' + error, 'error');
+                    showStatus('conversionStatus', 'HTML Conversion failed: ' + data.error, 'error');
                 }
             })
             .catch(err => {
                 document.getElementById('loading').style.display = 'none';
-                showStatus('conversionStatus', 'Conversion error: ' + err, 'error');
+                showStatus('conversionStatus', 'HTML Conversion error: ' + err, 'error');
             });
         }
         
@@ -422,12 +564,109 @@
             });
         }
         
+        function convertAllFiles() {
+            document.getElementById('loading').style.display = 'block';
+            showStatus('unifiedStatus', '🚀 Starting unified conversion of all HTML and DXF files...', 'info');
+            
+            fetch('/convert_all', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({})
+            })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.summary && data.summary.overall_success) {
+                    const summary = data.summary;
+                    const dxfInfo = summary.dxf_combined_pdf ? 
+                        `🏗️ DXF files: ${summary.dxf_files_processed} processed → ${summary.dxf_individual_pdfs} individual PDFs + 1 combined PDF` :
+                        `🏗️ DXF files: ${summary.dxf_files_processed} processed → ${summary.dxf_individual_pdfs} individual PDFs`;
+                    
+                    const msg = `✅ UNIFIED CONVERSION SUCCESSFUL! (ALPHABETICAL ORDER)
+Session: ${data.timestamp}
+📄 HTML files: ${summary.html_files_processed} processed, ${summary.html_successful} successful
+${dxfInfo}
+📁 Total PDFs created: ${summary.total_pdf_files_created}
+📄 Total pages: ${summary.total_pages_generated}
+⏱️ Duration: ${summary.duration_seconds.toFixed(1)}s
+
+Check the session folders below for organized outputs!`;
+                    showStatus('unifiedStatus', msg, 'success');
+                    
+                    // Refresh session folders after successful conversion
+                    setTimeout(() => {
+                        loadSessionFolders();
+                    }, 2000);
+                } else {
+                    const error = data.error || 'Unknown error occurred';
+                    showStatus('unifiedStatus', `❌ Unified conversion failed: ${error}`, 'error');
+                }
+            })
+            .catch(err => {
+                document.getElementById('loading').style.display = 'none';
+                showStatus('unifiedStatus', `❌ Unified conversion error: ${err}`, 'error');
+            });
+        }
+        
+        function loadSessionFolders() {
+            fetch('/get_session_folders')
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    displaySessionFolders(data.sessions);
+                } else {
+                    console.error('Failed to load session folders:', data.error);
+                }
+            })
+            .catch(err => {
+                console.error('Error loading session folders:', err);
+            });
+        }
+        
+        function displaySessionFolders(sessions) {
+            const container = document.getElementById('sessionFolders');
+            
+            if (sessions.length === 0) {
+                container.innerHTML = '<div class="empty-state"><p>No session folders found. Run unified conversion to create organized outputs.</p></div>';
+                return;
+            }
+            
+            let html = '<div class="file-list">';
+            
+            sessions.forEach(session => {
+                const timestamp = session.replace('session_', '').replace(/_/g, ' ').replace(/-/g, '/');
+                html += `
+                    <div class="file-item">
+                        <span class="file-name">📁 ${session} <span class="badge badge-info">${timestamp}</span></span>
+                        <div class="file-actions">
+                            <button class="btn btn-primary" onclick="viewSessionFiles('${session}')">📂 View Files</button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+        
+        function viewSessionFiles(sessionId) {
+            // This would open a modal or navigate to a detailed view
+            // For now, we'll show an alert with the session info
+            alert(`Session: ${sessionId}\n\nCheck these folders:\n• HTML_REPORTS/${sessionId}/\n• DXF_DRAWINGS/${sessionId}/\n• CONVERSION_LOGS/${sessionId}/`);
+        }
+        
         function showStatus(elementId, message, type) {
             const el = document.getElementById(elementId);
             el.textContent = message;
             el.className = `status ${type}`;
             el.style.display = message ? 'block' : 'none';
         }
+        
+        // Load session folders on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSessionFolders();
+        });
     </script>
 </body>
 </html>
