@@ -207,3 +207,72 @@ MIT License
 ## Author
 
 Created for engineering document processing and CAD drawing conversion.
+
+```
+# DXF to PDF Converter
+
+This is a Streamlit web application that converts DXF (AutoCAD Drawing Exchange Format) files to PDF format.
+
+## Features
+
+- Upload DXF files through a web interface
+- Convert DXF files to PDF format
+- Support for multiple entity types (lines, circles, arcs, polylines, text, etc.)
+- Multi-page output options
+- Smart drawing segmentation
+- Entity analysis and statistics
+
+## Requirements
+
+- Python 3.7+
+- Streamlit
+- ezdxf
+- reportlab
+
+## Installation
+
+```bash
+pip install -r requirements.txt
+```
+
+## Usage
+
+To run the app locally:
+
+```bash
+streamlit run streamlit_app.py
+```
+
+Then open your browser to the URL provided (typically http://localhost:8501).
+
+## Deployment
+
+This app can be deployed to Streamlit Cloud:
+
+1. Push this code to a GitHub repository
+2. Go to [share.streamlit.io](https://share.streamlit.io)
+3. Connect your GitHub account
+4. Select this repository
+5. Deploy the app
+
+## File Structure
+
+- `streamlit_app.py`: Main Streamlit application
+- `dxf2pdf/`: Python modules for DXF to PDF conversion
+- `requirements.txt`: Python dependencies
+- `DEPLOYMENT_GUIDE.md`: Detailed deployment instructions
+
+## Supported Entities
+
+- Lines and Polylines
+- Circles and Arcs
+- Text and Multi-text
+- Splines and Ellipses
+- Points and Blocks
+
+## Technical Info
+
+- Output: A4 Landscape PDF
+- Scale: Auto-calculated
+- Colors: Preserved from DXF
+- Max File Size: 200MB
