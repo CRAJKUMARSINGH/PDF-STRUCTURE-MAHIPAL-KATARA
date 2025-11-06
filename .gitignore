@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pythonlibs/
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+ENV/
+env/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+OUTPUT_PDF/*.pdf
+LOGS/*.txt
+LOGS/*.log
+
+# Keep directory structure
+!OUTPUT_PDF/.gitkeep
+!LOGS/.gitkeep
+!INPUT_DATA/.gitkeep
+
+# Temporary files
+*.tmp
+*.bak
+*.log

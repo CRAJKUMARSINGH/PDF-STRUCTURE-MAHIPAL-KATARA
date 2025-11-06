@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DXF to PDF Converter - A4 Landscape Multi-Page</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        
+        .section {
+            margin-bottom: 40px;
+        }
+        
+        .section-title {
+            font-size: 1.5em;
+            color: #444;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+        
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #f8f9ff;
+        }
+        
+        .upload-area:hover {
+            background: #e8ebff;
+            border-color: #764ba2;
+        }
+        
+        .upload-area.dragover {
+            background: #d8dbff;
+            border-color: #667eea;
+            transform: scale(1.02);
+        }
+        
+        .upload-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+        
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #059669;
+        }
+        
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+            padding: 6px 12px;
+            font-size: 0.9em;
+        }
+        
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+        
+        .file-list {
+            list-style: none;
+            margin-top: 20px;
+        }
+        
+        .file-item {
+            background: #f9fafb;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 4px solid #667eea;
+        }
+        
+        .file-item:hover {
+            background: #f3f4f6;
+        }
+        
+        .file-name {
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .file-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .status {
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+            display: none;
+        }
+        
+        .status.success {
+            background: #d1fae5;
+            border-left: 4px solid #10b981;
+            color: #065f46;
+        }
+        
+        .status.error {
+            background: #fee2e2;
+            border-left: 4px solid #ef4444;
+            color: #991b1b;
+        }
+        
+        .status.info {
+            background: #dbeafe;
+            border-left: 4px solid #3b82f6;
+            color: #1e40af;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        
+        .badge-info {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .badge-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #9ca3af;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏗️ DXF to PDF Converter</h1>
+        <p class="subtitle">Convert architectural/structural DXF drawings to A4 Landscape PDF with intelligent multi-page splitting</p>
+        
+        <div class="section">
+            <h2 class="section-title">📤 Upload DXF Files</h2>
+            <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+                <div class="upload-icon">📁</div>
+                <h3>Click or drag DXF files here</h3>
+                <p style="color: #666; margin-top: 10px;">Supports batch upload of multiple DXF files</p>
+                <input type="file" id="fileInput" multiple accept=".dxf,.DXF">
+            </div>
+            
+            <div id="uploadStatus" class="status"></div>
+        </div>
+        
+        <div class="section">
+            <h2 class="section-title">📋 Input Files (DXF)</h2>
+            {% if input_files %}
+                <button class="btn btn-success" onclick="convertAll()" style="margin-bottom: 15px;">
+                    🔄 Convert All to PDF (A4 Landscape)
+                </button>
+                <ul class="file-list">
+                    {% for file in input_files %}
+                    <li class="file-item">
+                        <span class="file-name">{{ file }}</span>
+                        <div class="file-actions">
+                            <button class="btn btn-primary" onclick="convertFile('{{ file }}')">Convert to PDF</button>
+                            <button class="btn btn-danger" onclick="deleteInput('{{ file }}')">Delete</button>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <div class="empty-state">
+                    <p>No DXF files in INPUT_DATA folder. Upload files above to get started.</p>
+                </div>
+            {% endif %}
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p style="margin-top: 15px; color: #667eea; font-weight: 600;">Converting DXF to PDF...</p>
+        </div>
+        
+        <div id="conversionStatus" class="status"></div>
+        
+        <div class="section">
+            <h2 class="section-title">📄 Generated PDFs (A4 Landscape)</h2>
+            {% if output_files %}
+                <ul class="file-list" id="outputList">
+                    {% for file in output_files %}
+                    <li class="file-item">
+                        <span class="file-name">{{ file }}</span>
+                        <div class="file-actions">
+                            <a href="/download/{{ file }}" class="btn btn-primary" download>⬇️ Download</a>
+                            <button class="btn btn-danger" onclick="deleteOutput('{{ file }}')">Delete</button>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <div class="empty-state">
+                    <p>No PDF files generated yet. Convert DXF files above to create PDFs.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            handleFiles(files);
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+        
+        function handleFiles(files) {
+            const formData = new FormData();
+            for (let file of files) {
+                formData.append('files[]', file);
+            }
+            
+            showStatus('uploadStatus', 'Uploading files...', 'info');
+            
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showStatus('uploadStatus', `✓ Uploaded ${data.count} file(s) successfully!`, 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showStatus('uploadStatus', 'Upload failed: ' + data.error, 'error');
+                }
+            })
+            .catch(err => {
+                showStatus('uploadStatus', 'Upload error: ' + err, 'error');
+            });
+        }
+        
+        function convertAll() {
+            document.getElementById('loading').style.display = 'block';
+            showStatus('conversionStatus', '', 'info');
+            
+            fetch('/convert', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({})
+            })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('loading').style.display = 'none';
+                if (data.success) {
+                    const msg = `✓ Conversion complete!\n${data.successful} succeeded, ${data.failed} failed\nTotal pages: ${data.results.reduce((sum, r) => sum + (r.pages || 0), 0)}`;
+                    showStatus('conversionStatus', msg, 'success');
+                    setTimeout(() => location.reload(), 2000);
+                } else {
+                    showStatus('conversionStatus', 'Conversion failed: ' + data.error, 'error');
+                }
+            })
+            .catch(err => {
+                document.getElementById('loading').style.display = 'none';
+                showStatus('conversionStatus', 'Conversion error: ' + err, 'error');
+            });
+        }
+        
+        function convertFile(filename) {
+            document.getElementById('loading').style.display = 'block';
+            
+            fetch('/convert', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({files: [filename]})
+            })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('loading').style.display = 'none';
+                if (data.success && data.results[0].success) {
+                    showStatus('conversionStatus', `✓ Converted ${filename} to ${data.results[0].pages} pages!`, 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    const error = data.results ? data.results[0].output : data.error;
+                    showStatus('conversionStatus', 'Conversion failed: ' + error, 'error');
+                }
+            })
+            .catch(err => {
+                document.getElementById('loading').style.display = 'none';
+                showStatus('conversionStatus', 'Conversion error: ' + err, 'error');
+            });
+        }
+        
+        function deleteInput(filename) {
+            if (!confirm(`Delete ${filename}?`)) return;
+            
+            fetch(`/delete_input/${filename}`, {method: 'POST'})
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Delete failed: ' + data.error);
+                }
+            });
+        }
+        
+        function deleteOutput(filename) {
+            if (!confirm(`Delete ${filename}?`)) return;
+            
+            fetch(`/delete_output/${filename}`, {method: 'POST'})
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Delete failed: ' + data.error);
+                }
+            });
+        }
+        
+        function showStatus(elementId, message, type) {
+            const el = document.getElementById(elementId);
+            el.textContent = message;
+            el.className = `status ${type}`;
+            el.style.display = message ? 'block' : 'none';
+        }
+    </script>
+</body>
+</html>
