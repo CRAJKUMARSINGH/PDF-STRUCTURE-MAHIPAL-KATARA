@@ -1,6 +1,6 @@
 """Renderer for split DXF islands - one island per A4 page."""
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 import logging
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
