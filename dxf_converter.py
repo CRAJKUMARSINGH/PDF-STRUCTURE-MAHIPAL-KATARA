@@ -1,8 +1,8 @@
 import ezdxf
+from ezdxf import recover
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
-from ezdxf.addons.drawing.properties import RenderContext
-from ezdxf.addons.drawing.frontend import Frontend
+from ezdxf.addons.drawing import RenderContext, Frontend
 from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
 import numpy as np
 from pathlib import Path
@@ -26,113 +26,75 @@ class DXFToPDFConverter:
         self.output_folder.mkdir(exist_ok=True)
         self.log_folder.mkdir(exist_ok=True)
     
-    def get_entity_bounds(self, entity):
-        try:
-            if hasattr(entity, 'dxf') and hasattr(entity.dxf, 'insert'):
-                x, y = entity.dxf.insert.x, entity.dxf.insert.y
-                return (x, y, x, y)
-            
-            if entity.dxftype() == 'LINE':
-                return (
-                    min(entity.dxf.start.x, entity.dxf.end.x),
-                    min(entity.dxf.start.y, entity.dxf.end.y),
-                    max(entity.dxf.start.x, entity.dxf.end.x),
-                    max(entity.dxf.start.y, entity.dxf.end.y)
-                )
-            elif entity.dxftype() == 'CIRCLE':
-                cx, cy, r = entity.dxf.center.x, entity.dxf.center.y, entity.dxf.radius
-                return (cx - r, cy - r, cx + r, cy + r)
-            elif entity.dxftype() == 'ARC':
-                cx, cy, r = entity.dxf.center.x, entity.dxf.center.y, entity.dxf.radius
-                return (cx - r, cy - r, cx + r, cy + r)
-            elif entity.dxftype() in ['LWPOLYLINE', 'POLYLINE']:
-                points = list(entity.get_points())
-                if points:
-                    xs = [p[0] for p in points]
-                    ys = [p[1] for p in points]
-                    return (min(xs), min(ys), max(xs), max(ys))
-            elif entity.dxftype() == 'TEXT':
-                x, y = entity.dxf.insert.x, entity.dxf.insert.y
-                return (x, y, x + 10, y + 5)
-            elif entity.dxftype() == 'MTEXT':
-                x, y = entity.dxf.insert.x, entity.dxf.insert.y
-                return (x, y, x + 20, y + 10)
-        except Exception as e:
-            logger.debug(f"Could not get bounds for {entity.dxftype()}: {e}")
+    def get_drawing_bounds(self, msp):
+        min_x = min_y = float('inf')
+        max_x = max_y = float('-inf')
         
-        return None
+        for entity in msp:
+            try:
+                if hasattr(entity, 'dxf'):
+                    if entity.dxftype() == 'LINE':
+                        min_x = min(min_x, entity.dxf.start.x, entity.dxf.end.x)
+                        max_x = max(max_x, entity.dxf.start.x, entity.dxf.end.x)
+                        min_y = min(min_y, entity.dxf.start.y, entity.dxf.end.y)
+                        max_y = max(max_y, entity.dxf.start.y, entity.dxf.end.y)
+                    elif entity.dxftype() in ['CIRCLE', 'ARC']:
+                        cx, cy, r = entity.dxf.center.x, entity.dxf.center.y, entity.dxf.radius
+                        min_x = min(min_x, cx - r)
+                        max_x = max(max_x, cx + r)
+                        min_y = min(min_y, cy - r)
+                        max_y = max(max_y, cy + r)
+                    elif entity.dxftype() in ['LWPOLYLINE', 'POLYLINE']:
+                        for point in entity.get_points():
+                            min_x = min(min_x, point[0])
+                            max_x = max(max_x, point[0])
+                            min_y = min(min_y, point[1])
+                            max_y = max(max_y, point[1])
+                    elif entity.dxftype() in ['TEXT', 'MTEXT']:
+                        x, y = entity.dxf.insert.x, entity.dxf.insert.y
+                        min_x = min(min_x, x)
+                        max_x = max(max_x, x)
+                        min_y = min(min_y, y)
+                        max_y = max(max_y, y)
+            except Exception as e:
+                logger.debug(f"Could not get bounds for {entity.dxftype()}: {e}")
+        
+        if min_x == float('inf'):
+            return 0, 0, 100, 100
+        
+        return min_x, min_y, max_x, max_y
     
-    def analyze_drawing_sections(self, msp):
-        entities = list(msp)
-        if not entities:
-            return [entities]
-        
-        entity_bounds = []
-        for entity in entities:
-            bounds = self.get_entity_bounds(entity)
-            if bounds:
-                entity_bounds.append((entity, bounds))
-        
-        if not entity_bounds:
-            return [entities]
-        
-        all_bounds = [b[1] for b in entity_bounds]
-        min_x = min(b[0] for b in all_bounds)
-        max_x = max(b[2] for b in all_bounds)
-        min_y = min(b[1] for b in all_bounds)
-        max_y = max(b[3] for b in all_bounds)
-        
+    def calculate_page_regions(self, min_x, min_y, max_x, max_y):
         total_width = max_x - min_x
         total_height = max_y - min_y
         
-        if total_width == 0 or total_height == 0:
-            return [entities]
+        if total_width <= 0 or total_height <= 0:
+            return [(min_x, min_y, max_x, max_y)]
         
-        aspect_ratio = total_width / total_height
         a4_aspect = self.A4_WIDTH_MM / self.A4_HEIGHT_MM
+        page_height = total_width / a4_aspect
         
-        if aspect_ratio < a4_aspect * 1.5 and total_height < total_width * 2:
-            return [entities]
+        if total_height <= page_height * 1.3:
+            return [(min_x, min_y, max_x, max_y)]
         
-        y_positions = sorted(set(b[1] for b in all_bounds) | set(b[3] for b in all_bounds))
+        num_pages = int(np.ceil(total_height / page_height))
+        num_pages = min(num_pages, 50)
         
-        gaps = []
-        for i in range(len(y_positions) - 1):
-            gap_size = y_positions[i + 1] - y_positions[i]
-            entities_in_gap = sum(1 for b in all_bounds if b[1] <= y_positions[i] and b[3] >= y_positions[i + 1])
-            if entities_in_gap == 0 and gap_size > total_height * 0.05:
-                gaps.append((y_positions[i], y_positions[i + 1], gap_size))
+        logger.info(f"Drawing size: {total_width:.1f} x {total_height:.1f}, splitting into {num_pages} page(s)")
         
-        if not gaps:
-            num_sections = max(2, int(total_height / (total_width * a4_aspect)) + 1)
-            section_height = total_height / num_sections
-            split_points = [min_y + i * section_height for i in range(1, num_sections)]
-        else:
-            gaps.sort(key=lambda x: x[2], reverse=True)
-            num_splits = min(len(gaps), max(1, int(total_height / (total_width * a4_aspect))))
-            split_points = [g[0] + (g[1] - g[0]) / 2 for g in gaps[:num_splits]]
-            split_points.sort()
+        regions = []
+        section_height = total_height / num_pages
+        overlap = section_height * 0.05
         
-        sections = [[] for _ in range(len(split_points) + 1)]
-        
-        for entity, bounds in entity_bounds:
-            entity_center_y = (bounds[1] + bounds[3]) / 2
+        for i in range(num_pages):
+            y_start = min_y + i * section_height - (overlap if i > 0 else 0)
+            y_end = min_y + (i + 1) * section_height + (overlap if i < num_pages - 1 else 0)
+            y_end = min(y_end, max_y)
             
-            section_idx = 0
-            for i, split_y in enumerate(split_points):
-                if entity_center_y > split_y:
-                    section_idx = i + 1
-                else:
-                    break
-            
-            sections[section_idx].append(entity)
+            if y_start < max_y:
+                regions.append((min_x, y_start, max_x, y_end))
         
-        sections = [s for s in sections if s]
-        
-        if len(sections) <= 1:
-            return [entities]
-        
-        return sections
+        return regions
     
     def convert_dxf_to_pdf(self, dxf_path, pdf_path=None, max_pages=50):
         if pdf_path is None:
@@ -141,47 +103,54 @@ class DXFToPDFConverter:
         logger.info(f"Converting {dxf_path} to {pdf_path}")
         
         try:
-            doc = ezdxf.readfile(dxf_path)
+            try:
+                doc, auditor = recover.readfile(str(dxf_path))
+            except IOError:
+                logger.error(f"Not a DXF file or I/O error: {dxf_path}")
+                return False, "Not a valid DXF file", 0
+            except ezdxf.DXFStructureError:
+                logger.error(f"Invalid or corrupted DXF file: {dxf_path}")
+                return False, "Corrupted DXF file", 0
             
-            auditor = doc.audit()
             if auditor.has_errors:
-                logger.warning(f"DXF file has {len(auditor.errors)} errors, attempting to fix...")
-                for error in auditor.errors[:5]:
+                logger.warning(f"DXF file has {len(auditor.errors)} errors")
+                for error in auditor.errors[:3]:
                     logger.warning(f"  - {error}")
             
             msp = doc.modelspace()
             
-            sections = self.analyze_drawing_sections(msp)
-            logger.info(f"Split drawing into {len(sections)} sections")
+            min_x, min_y, max_x, max_y = self.get_drawing_bounds(msp)
+            regions = self.calculate_page_regions(min_x, min_y, max_x, max_y)
+            
+            logger.info(f"Drawing bounds: ({min_x:.1f}, {min_y:.1f}) to ({max_x:.1f}, {max_y:.1f})")
+            logger.info(f"Creating {len(regions)} page(s)")
             
             fig_width_inch = self.A4_WIDTH_MM / 25.4
             fig_height_inch = self.A4_HEIGHT_MM / 25.4
             
             with PdfPages(pdf_path) as pdf:
-                for idx, section_entities in enumerate(sections[:max_pages]):
-                    if not section_entities:
-                        continue
-                    
-                    logger.info(f"Rendering page {idx + 1}/{len(sections)} with {len(section_entities)} entities")
+                for idx, (rx_min, ry_min, rx_max, ry_max) in enumerate(regions[:max_pages]):
+                    logger.info(f"Rendering page {idx + 1}/{len(regions)}")
                     
                     fig = plt.figure(figsize=(fig_width_inch, fig_height_inch), dpi=self.DPI)
-                    ax = fig.add_axes((0, 0, 1, 1))
+                    ax = fig.add_subplot(111)
                     ax.set_aspect('equal')
                     
                     ctx = RenderContext(doc)
                     out = MatplotlibBackend(ax)
                     
-                    frontend = Frontend(ctx, out)
-                    for entity in section_entities:
-                        try:
-                            frontend.draw_entity(entity)
-                        except Exception as e:
-                            logger.debug(f"Could not render entity {entity.dxftype()}: {e}")
+                    Frontend(ctx, out).draw_layout(msp, finalize=True)
                     
-                    out.finalize()
+                    region_width = rx_max - rx_min
+                    region_height = ry_max - ry_min
                     
-                    ax.autoscale()
-                    ax.margins(0.02)
+                    if region_width > 0 and region_height > 0:
+                        margin_x = region_width * 0.05
+                        margin_y = region_height * 0.05
+                        
+                        ax.set_xlim(rx_min - margin_x, rx_max + margin_x)
+                        ax.set_ylim(ry_min - margin_y, ry_max + margin_y)
+                    
                     ax.axis('off')
                     
                     pdf.savefig(fig, dpi=self.DPI, bbox_inches='tight', pad_inches=0.1)
@@ -194,11 +163,11 @@ class DXFToPDFConverter:
                 d['Keywords'] = 'DXF, PDF, A4, Landscape, Footing, Structural'
                 d['CreationDate'] = datetime.now()
             
-            logger.info(f"Successfully created PDF with {len(sections)} pages: {pdf_path}")
-            return True, str(pdf_path), len(sections)
+            logger.info(f"Successfully created PDF with {len(regions)} page(s): {pdf_path}")
+            return True, str(pdf_path), len(regions)
         
         except Exception as e:
-            logger.error(f"Error converting {dxf_path}: {str(e)}")
+            logger.error(f"Error converting {dxf_path}: {str(e)}", exc_info=True)
             return False, str(e), 0
     
     def batch_convert(self, pattern="*.dxf"):
