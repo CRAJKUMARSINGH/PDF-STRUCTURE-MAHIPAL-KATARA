@@ -105,6 +105,17 @@ def convert_dxf_file(dxf_path: Path, output_path: Path, num_pages: int = 1, use_
     logger = logging.getLogger(__name__)
     
     try:
+        # Validate input file
+        if not dxf_path.exists():
+            logger.error(f"DXF file does not exist: {dxf_path}")
+            return False
+        
+        if dxf_path.stat().st_size == 0:
+            logger.error(f"DXF file is empty: {dxf_path}")
+            return False
+        
+        logger.info(f"Converting DXF file: {dxf_path} (size: {dxf_path.stat().st_size} bytes)")
+        
         # Parse DXF file
         parser = DXFParser()
         drawing = parser.parse_file(dxf_path)
