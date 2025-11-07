@@ -12,6 +12,11 @@ import sys
 import os
 import zipfile
 from datetime import datetime
+import logging
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Add the current directory to Python path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -240,13 +245,22 @@ with batch_col3:
                             pdf_path = dxf_path.with_suffix('.pdf')
                             
                             try:
+                                # Log file info
+                                file_size = dxf_path.stat().st_size
+                                logger.info(f"Converting {dxf_file.name} ({file_size} bytes)")
+                                
                                 success = convert_dxf_file(dxf_path, pdf_path, num_pages=1, use_split=False)
                                 if success and pdf_path.exists():
                                     pdf_paths.append(pdf_path)
+                                    logger.info(f"Successfully converted {dxf_file.name}")
                                 else:
-                                    failed.append((dxf_file.name, "Conversion failed"))
+                                    error_msg = "Conversion returned False - file may be empty or invalid"
+                                    logger.error(f"Failed to convert {dxf_file.name}: {error_msg}")
+                                    failed.append((dxf_file.name, error_msg))
                             except Exception as e:
-                                failed.append((dxf_file.name, str(e)))
+                                error_msg = f"{type(e).__name__}: {str(e)}"
+                                logger.error(f"Exception converting {dxf_file.name}: {error_msg}")
+                                failed.append((dxf_file.name, error_msg))
                         
                         if pdf_paths:
                             st.success(f"✅ Converted {len(pdf_paths)} DXF file(s)")
@@ -345,14 +359,20 @@ with col1:
                 
                 with st.spinner('Converting DXF to PDF...'):
                     try:
+                        logger.info(f"Starting conversion of {uploaded_file.name}")
                         success = convert_dxf_file(
                             tmp_path, 
                             pdf_path, 
                             num_pages=num_pages, 
                             use_split=use_split
                         )
+                        if not success:
+                            logger.error(f"Conversion returned False for {uploaded_file.name}")
                     except Exception as conv_error:
-                        st.error(f"❌ Conversion error: {str(conv_error)}")
+                        error_type = type(conv_error).__name__
+                        error_msg = str(conv_error)
+                        logger.error(f"Exception during conversion: {error_type}: {error_msg}")
+                        st.error(f"❌ Conversion error ({error_type}): {error_msg}")
                         success = False
                 
                 if success and pdf_path.exists():
