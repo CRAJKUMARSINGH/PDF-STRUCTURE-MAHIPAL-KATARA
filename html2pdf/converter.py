@@ -1,27 +1,100 @@
-"""HTML to PDF converter module."""
+"""HTML to PDF converter module using reportlab."""
 from pathlib import Path
 from typing import List, Tuple, Optional
 import logging
+from html.parser import HTMLParser
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Table, TableStyle
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
+import re
 
 logger = logging.getLogger(__name__)
 
-# Try multiple HTML to PDF conversion methods
-try:
-    from weasyprint import HTML
-    CONVERTER_METHOD = 'weasyprint'
-    logger.info("Using WeasyPrint for HTML to PDF conversion")
-except ImportError:
-    try:
-        import pdfkit
-        CONVERTER_METHOD = 'pdfkit'
-        logger.info("Using pdfkit for HTML to PDF conversion")
-    except ImportError:
-        CONVERTER_METHOD = None
-        logger.warning("No HTML to PDF converter available")
+
+class HTMLToReportLabParser(HTMLParser):
+    """Parse HTML and convert to ReportLab flowables."""
+    
+    def __init__(self):
+        super().__init__()
+        self.flowables = []
+        self.styles = getSampleStyleSheet()
+        self.current_text = []
+        self.current_style = self.styles['Normal']
+        self.in_table = False
+        self.table_data = []
+        self.current_row = []
+        
+    def handle_starttag(self, tag, attrs):
+        if tag == 'h1':
+            self.current_style = self.styles['Heading1']
+        elif tag == 'h2':
+            self.current_style = self.styles['Heading2']
+        elif tag == 'h3':
+            self.current_style = self.styles['Heading3']
+        elif tag == 'p':
+            self.current_style = self.styles['Normal']
+        elif tag == 'table':
+            self.in_table = True
+            self.table_data = []
+        elif tag == 'tr':
+            self.current_row = []
+        elif tag == 'br':
+            self.current_text.append('<br/>')
+    
+    def handle_endtag(self, tag):
+        if tag in ['h1', 'h2', 'h3', 'p']:
+            if self.current_text:
+                text = ''.join(self.current_text).strip()
+                if text:
+                    try:
+                        para = Paragraph(text, self.current_style)
+                        self.flowables.append(para)
+                        self.flowables.append(Spacer(1, 0.2*inch))
+                    except:
+                        pass
+                self.current_text = []
+            self.current_style = self.styles['Normal']
+        elif tag == 'table':
+            if self.table_data:
+                try:
+                    table = Table(self.table_data)
+                    table.setStyle(TableStyle([
+                        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                        ('FONTSIZE', (0, 0), (-1, 0), 10),
+                        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                    ]))
+                    self.flowables.append(table)
+                    self.flowables.append(Spacer(1, 0.3*inch))
+                except:
+                    pass
+            self.in_table = False
+            self.table_data = []
+        elif tag == 'tr':
+            if self.current_row:
+                self.table_data.append(self.current_row)
+            self.current_row = []
+    
+    def handle_data(self, data):
+        text = data.strip()
+        if text:
+            if self.in_table:
+                self.current_row.append(text)
+            else:
+                # Clean up text for reportlab
+                text = re.sub(r'\s+', ' ', text)
+                self.current_text.append(text)
 
 
 class HTMLConverter:
-    """Converts HTML files to PDF format."""
+    """Converts HTML files to PDF format using reportlab."""
     
     def __init__(self, temp_dir: Path):
         """
@@ -32,10 +105,7 @@ class HTMLConverter:
         """
         self.temp_dir = temp_dir
         self.temp_dir.mkdir(parents=True, exist_ok=True)
-        self.converter_method = CONVERTER_METHOD
-        
-        if self.converter_method is None:
-            logger.error("No HTML to PDF converter available. Install weasyprint or pdfkit.")
+        logger.info("Using ReportLab for HTML to PDF conversion")
     
     def convert_file(self, html_path: Path) -> Optional[Path]:
         """
@@ -52,22 +122,42 @@ class HTMLConverter:
             pdf_filename = html_path.stem + '.pdf'
             pdf_path = self.temp_dir / pdf_filename
             
-            logger.info(f"Converting {html_path.name} to PDF using {self.converter_method}...")
+            logger.info(f"Converting {html_path.name} to PDF using ReportLab...")
             
-            if self.converter_method == 'weasyprint':
-                # Use WeasyPrint (works on Streamlit Cloud)
-                HTML(filename=str(html_path)).write_pdf(str(pdf_path))
-            elif self.converter_method == 'pdfkit':
-                # Use pdfkit (requires wkhtmltopdf)
-                options = {
-                    'enable-local-file-access': None,
-                    'encoding': 'UTF-8',
-                    'quiet': ''
-                }
-                pdfkit.from_file(str(html_path), str(pdf_path), options=options)
-            else:
-                logger.error("No HTML to PDF converter available")
+            # Read HTML content
+            html_content = html_path.read_text(encoding='utf-8', errors='ignore')
+            
+            # Parse HTML
+            parser = HTMLToReportLabParser()
+            parser.feed(html_content)
+            
+            if not parser.flowables:
+                # If no flowables, create a simple text document
+                logger.warning(f"No structured content found in {html_path.name}, creating text document")
+                # Remove HTML tags for plain text
+                plain_text = re.sub(r'<[^>]+>', ' ', html_content)
+                plain_text = re.sub(r'\s+', ' ', plain_text).strip()
+                
+                if plain_text:
+                    styles = getSampleStyleSheet()
+                    para = Paragraph(plain_text[:5000], styles['Normal'])  # Limit length
+                    parser.flowables = [para]
+            
+            if not parser.flowables:
+                logger.error(f"No content to convert in {html_path.name}")
                 return None
+            
+            # Create PDF
+            doc = SimpleDocTemplate(
+                str(pdf_path),
+                pagesize=A4,
+                rightMargin=72,
+                leftMargin=72,
+                topMargin=72,
+                bottomMargin=18
+            )
+            
+            doc.build(parser.flowables)
             
             if pdf_path.exists():
                 logger.info(f"Successfully converted {html_path.name}")
