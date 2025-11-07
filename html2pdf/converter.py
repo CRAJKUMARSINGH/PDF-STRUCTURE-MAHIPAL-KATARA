@@ -2,9 +2,22 @@
 from pathlib import Path
 from typing import List, Tuple, Optional
 import logging
-import pdfkit
 
 logger = logging.getLogger(__name__)
+
+# Try multiple HTML to PDF conversion methods
+try:
+    from weasyprint import HTML
+    CONVERTER_METHOD = 'weasyprint'
+    logger.info("Using WeasyPrint for HTML to PDF conversion")
+except ImportError:
+    try:
+        import pdfkit
+        CONVERTER_METHOD = 'pdfkit'
+        logger.info("Using pdfkit for HTML to PDF conversion")
+    except ImportError:
+        CONVERTER_METHOD = None
+        logger.warning("No HTML to PDF converter available")
 
 
 class HTMLConverter:
@@ -19,13 +32,10 @@ class HTMLConverter:
         """
         self.temp_dir = temp_dir
         self.temp_dir.mkdir(parents=True, exist_ok=True)
+        self.converter_method = CONVERTER_METHOD
         
-        # Configure wkhtmltopdf options
-        self.options = {
-            'enable-local-file-access': None,
-            'encoding': 'UTF-8',
-            'quiet': ''
-        }
+        if self.converter_method is None:
+            logger.error("No HTML to PDF converter available. Install weasyprint or pdfkit.")
     
     def convert_file(self, html_path: Path) -> Optional[Path]:
         """
@@ -42,16 +52,32 @@ class HTMLConverter:
             pdf_filename = html_path.stem + '.pdf'
             pdf_path = self.temp_dir / pdf_filename
             
-            logger.info(f"Converting {html_path.name} to PDF...")
+            logger.info(f"Converting {html_path.name} to PDF using {self.converter_method}...")
             
-            # Convert HTML to PDF
-            pdfkit.from_file(str(html_path), str(pdf_path), options=self.options)
+            if self.converter_method == 'weasyprint':
+                # Use WeasyPrint (works on Streamlit Cloud)
+                HTML(filename=str(html_path)).write_pdf(str(pdf_path))
+            elif self.converter_method == 'pdfkit':
+                # Use pdfkit (requires wkhtmltopdf)
+                options = {
+                    'enable-local-file-access': None,
+                    'encoding': 'UTF-8',
+                    'quiet': ''
+                }
+                pdfkit.from_file(str(html_path), str(pdf_path), options=options)
+            else:
+                logger.error("No HTML to PDF converter available")
+                return None
             
-            logger.info(f"Successfully converted {html_path.name}")
-            return pdf_path
+            if pdf_path.exists():
+                logger.info(f"Successfully converted {html_path.name}")
+                return pdf_path
+            else:
+                logger.warning(f"PDF not created for {html_path.name}")
+                return None
             
         except Exception as e:
-            logger.warning(f"Failed to convert {html_path.name}: {e}")
+            logger.error(f"Failed to convert {html_path.name}: {e}", exc_info=True)
             return None
     
     def convert_batch(self, html_files: List[Path]) -> Tuple[List[Path], List[Tuple[Path, str]]]:
